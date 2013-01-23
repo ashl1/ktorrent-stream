@@ -31,6 +31,7 @@
 namespace Phonon
 {
 	class AudioOutput;
+	class MediaController;
 }
 
 
@@ -51,39 +52,51 @@ namespace kt
 		MediaPlayer(QObject* parent);
 		virtual ~MediaPlayer();
 		
-		Phonon::AudioOutput* output() {return audio;}
-		Phonon::MediaObject* media0bject() {return media;}
-		
-		/// Are we paused
-		bool paused() const;
-		
-		/// Resume paused stuff
-		void resume(); 
-		
-		/// Play a file
-		void play(MediaFileRef file);
-		
-		/// Queue a file
-		void queue(MediaFileRef file);
-		
-		/// Pause playing
-		void pause();
-		
-		/// Stop playing
-		void stop();
+		QList<Phonon::AudioChannelDescription> getAudioChannels() const;
 		
 		/// Get the current file we are playing
 		MediaFileRef getCurrentSource() const;
 		
+		Phonon::MediaObject* media0bject() {return media;}
+		
+		Phonon::AudioOutput* output() {return audio;}
+
+		/// Pause playing
+		void pause();
+		
+		/// Are we paused
+		bool paused() const;
+		
+		/// Play a file
+		void play(MediaFileRef file);
+		
 		/// Play the previous song
 		MediaFileRef prev();
+		
+		/// Queue a file
+		void queue(MediaFileRef file);
+		
+		/// Resume paused stuff
+		void resume(); 
+		
+		void setAudioChannel(Phonon::AudioChannelDescription audio_track);
+		
+		/// Stop playing
+		void stop();
 		
 	private slots:
 		void onStateChanged(Phonon::State cur,Phonon::State old);
 		void hasVideoChanged(bool hasVideo);
 		void streamStateChanged(int state);
+		void availableAudioChannelsChanged();
 		
 	signals:
+		/**
+		 * Emitted when availabilitu of audio channels of the video has been changed.
+		 * @param audio_channel_index The index of audio stream (valid or invalid - should be checked by isValid())
+		 */
+		void availableAudioChannelsChanged(quint8 audio_channel_index);
+		
 		/**
 		 * Emitted to enable or disable the play buttons.
 		 * @param flags Flags indicating which buttons to enable
@@ -123,6 +136,8 @@ namespace kt
 	private:
 		Phonon::MediaObject* media;
 		Phonon::AudioOutput* audio;
+		QList<Phonon::AudioChannelDescription> audio_channels_in_video;
+		Phonon::MediaController* media_controller;
 		QList<MediaFileRef> history;
 		MediaFileRef current;
 		bool buffering;

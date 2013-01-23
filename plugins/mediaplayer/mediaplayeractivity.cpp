@@ -41,7 +41,7 @@
 #include "playlist.h"
 #include "mediacontroller.h"
 
-
+#include <QThread>
 
 using namespace bt;
 
@@ -167,22 +167,29 @@ namespace kt
 		}
 		else
 		{
-			video = new VideoWidget(media_player,ac,0);
+			video = new VideoWidget(media_player,0);
+			video->init(ac);
 			connect(video,SIGNAL(toggleFullScreen(bool)),this,SLOT(setVideoFullScreen(bool)));
 			int idx = tabs->addTab(video,KIcon("video-x-generic"),path);
 			tabs->setTabToolTip(idx,i18n("Movie player"));
 			tabs->setCurrentIndex(idx);
 			tabs->setTabBarHidden(false);
+			
+			video->initVideo();
+			Out(SYS_MPL|LOG_DEBUG) << "Opening video widget! Point 2 finished" << endl;
 		}
 		
 		if (!show_video_action->isChecked())
 			show_video_action->setChecked(true);
+		
+		Out(SYS_MPL|LOG_DEBUG) << "Opening video widget! Point 0 finished" << endl;
 	}
 
 	void MediaPlayerActivity::closeVideo()
 	{
 		if (video)
 		{
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayerActivity::closeVideo()" << endl;
 			tabs->removePage(video);
 			if (show_video_action->isChecked())
 				show_video_action->setChecked(false);
@@ -195,9 +202,15 @@ namespace kt
 	void MediaPlayerActivity::showVideo(bool on)
 	{
 		if (on)
+		{
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayerActivity::showVideo() - open" << endl;
 			openVideo();
+		}
 		else
+		{
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayerActivity::showVideo() - close" << endl;
 			closeVideo();
+		}
 	}
 
 	void MediaPlayerActivity::play()

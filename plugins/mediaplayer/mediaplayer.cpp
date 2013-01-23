@@ -22,9 +22,11 @@
 #include <Phonon/Path>
 #include <Phonon/AudioOutput>
 #include <Phonon/Global>
+#include <Phonon/MediaController>
 #include <KLocale>
 #include <util/log.h>
 #include <torrent/torrentfilestream.h>
+#include <qthread.h>
 #include "mediaplayer.h"
 
 using namespace bt;
@@ -37,12 +39,14 @@ namespace kt
 	{
 		media = new Phonon::MediaObject(this);
 		audio = new Phonon::AudioOutput(this);
+		media_controller = new Phonon::MediaController(media);
 		Phonon::createPath(media,audio);
 		
 		connect(media,SIGNAL(stateChanged(Phonon::State,Phonon::State)),
 				this,SLOT(onStateChanged(Phonon::State,Phonon::State)));
 		connect(media,SIGNAL(hasVideoChanged(bool)),this,SLOT(hasVideoChanged(bool)));
 		connect(media,SIGNAL(aboutToFinish()),this,SIGNAL(aboutToFinish()));
+		connect(media_controller, SIGNAL(availableAudioChannelsChanged()), this, SLOT(availableAudioChannelsChanged()));
 		media->setTickInterval(1000);
 	}
 
@@ -52,109 +56,55 @@ namespace kt
 		stop();
 	}
 	
-	bool MediaPlayer::paused() const
+	void MediaPlayer::availableAudioChannelsChanged()
 	{
-		return media->state() == Phonon::PausedState;
-	}
-
-	void MediaPlayer::resume()
-	{
-		if (paused() || manually_paused)
-		{
-			if (buffering)
-				manually_paused = false;
-			else
-				media->play();
-		}
-	}
-
-	void MediaPlayer::play(kt::MediaFileRef file)
-	{
-		buffering = false;
-		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing " << file.path() << endl;
-		Phonon::MediaSource ms = file.createMediaSource(this); 
-		media->setCurrentSource(ms);
-			
-		MediaFile::Ptr ptr = file.mediaFile();
-		if (ptr && ptr->isVideo())
-		{
-			Out(SYS_MPL|LOG_DEBUG) << "Opening video widget !" << endl;
-			openVideo();
-		}
+		audio_channels_in_video = media_controller->availableAudioChannels();
+		Out(SYS_MPL|LOG_DEBUG) << endl;
+		Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer: Available audio channels has been changed!!!!" << endl;
+		Out(SYS_MPL|LOG_DEBUG) << "  has "<< audio_channels_in_video.size() << " audio tracks" << endl;
 		
-		history.append(file);
-		playing(file);
-		current = file;
-		media->play();
+		Phonon::AudioChannelDescription current_audio = media_controller->currentAudioChannel();
+		quint8 current_audio_index = 0;
+		
+		quint8 i = 0;
+		for (; i < audio_channels_in_video.size(); ++i)
+		{
+			Out(SYS_MPL|LOG_NOTICE) << "  " << audio_channels_in_video[i].name() << ":  " << audio_channels_in_video[i].description() << endl;
+			if (current_audio == audio_channels_in_video[i])
+				current_audio_index = i;
+		}
+		Out(SYS_MPL|LOG_NOTICE) << endl;
+		
+		emit availableAudioChannelsChanged(i);
 	}
 
-	
-	void MediaPlayer::queue(kt::MediaFileRef file)
+	QList< Phonon::AudioChannelDescription > MediaPlayer::getAudioChannels() const
 	{
-		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: enqueue " << file.path() << endl;
-		media->enqueue(file.createMediaSource(this));
-		history.append(file);
-		onStateChanged(media->state(),Phonon::StoppedState);
+		return audio_channels_in_video;
 	}
-		
-	void MediaPlayer::pause()
+
+	MediaFileRef MediaPlayer::getCurrentSource() const
 	{
-		if (!buffering)
+		if (history.isEmpty())
+			return MediaFileRef();
+		else
+			return MediaFileRef(history.back());
+	}
+
+	void MediaPlayer::hasVideoChanged(bool hasVideo)
+	{
+		if (hasVideo)
 		{
-			media->pause();
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer::hasVideoChanged() - open" << endl;
+			emit openVideo();
 		}
 		else
 		{
-			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer: paused" << endl;
-			manually_paused = true;
-			int flags = MEDIA_PLAY|MEDIA_STOP;
-			if (history.count() > 1)
-				flags |= MEDIA_PREV;
-			
-			enableActions(flags);
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer::hasVideoChanged() - close" << endl;
+			emit closeVideo();
 		}
 	}
-		
-	void MediaPlayer::stop()
-	{
-		media->stop();
-		media->clear();
-		if (buffering)
-			buffering = false;
-		
-		current = MediaFileRef();
-		onStateChanged(media->state(),Phonon::StoppedState);
-	}
-	
-	MediaFileRef MediaPlayer::prev()
-	{
-		if (media->state() == Phonon::PausedState || media->state() == Phonon::PlayingState)
-		{
-			if (history.count() >= 2)
-			{
-				history.pop_back(); // remove the currently playing file
-				MediaFileRef & file = history.back();
-				media->setCurrentSource(file.createMediaSource(this));
-				media->play();
-				Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing previous file " << file.path() << endl;
-				return file;
-			}
-		}
-		else 
-		{
-			if (history.count() > 0)
-			{
-				MediaFileRef & file = history.back();
-				media->setCurrentSource(file.createMediaSource(this));
-				media->play();
-				Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing previous file " << file.path() << endl;
-				return file;
-			}
-		}
-		
-		return QString();
-	}
-	
+
 	void MediaPlayer::onStateChanged(Phonon::State cur, Phonon::State)
 	{
 		unsigned int flags = 0;
@@ -184,6 +134,9 @@ namespace kt
 					flags |= MEDIA_PREV;
 				
 				enableActions(flags);
+				
+				Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer::onStateChanged() - Phonon::PlayingState" << endl;
+
 				hasVideoChanged(media->hasVideo());
 				playing(getCurrentSource());
 				break;
@@ -212,6 +165,123 @@ namespace kt
 		}
 	}
 	
+	void MediaPlayer::pause()
+	{
+		if (!buffering)
+		{
+			media->pause();
+		}
+		else
+		{
+			Out(SYS_MPL|LOG_DEBUG) << "MediaPlayer: paused" << endl;
+			manually_paused = true;
+			int flags = MEDIA_PLAY|MEDIA_STOP;
+			if (history.count() > 1)
+				flags |= MEDIA_PREV;
+			
+			enableActions(flags);
+		}
+	}
+		
+	bool MediaPlayer::paused() const
+	{
+		return media->state() == Phonon::PausedState;
+	}
+
+	void MediaPlayer::play(kt::MediaFileRef file)
+	{
+		buffering = false;
+		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing " << file.path() << endl;
+		Phonon::MediaSource ms = file.createMediaSource(this); 
+		media->setCurrentSource(ms);
+		
+		
+// 		Phonon::MediaController::Features media_supported_feautures = media_controller->supportedFeatures();
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports Angles? " << media_supported_feautures.testFlag(Phonon::MediaController::Angles) << endl;
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports Chapters? " << media_supported_feautures.testFlag(Phonon::MediaController::Chapters) << endl;
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports Navigations? " << media_supported_feautures.testFlag(Phonon::MediaController::Navigations) << endl;
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports Titles? " << media_supported_feautures.testFlag(Phonon::MediaController::Titles) << endl;
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports Subtitles? " << media_supported_feautures.testFlag(Phonon::MediaController::Subtitles) << endl;
+// 		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer supports AudioChannels? " << media_supported_feautures.testFlag(Phonon::MediaController::AudioChannels) << endl;
+			
+		MediaFile::Ptr ptr = file.mediaFile();
+		if (ptr && ptr->isVideo())
+		{
+			Out(SYS_MPL|LOG_DEBUG) << "Opening video widget !" << endl;
+			emit openVideo();
+		}
+		
+		history.append(file);
+		playing(file);
+		current = file;
+		//media->play();
+		Out(SYS_MPL|LOG_DEBUG) << "Thread: " << thread()->currentThreadId() << "Opening video widget! Point 1 finished" << endl;
+	}
+
+	MediaFileRef MediaPlayer::prev()
+	{
+		if (media->state() == Phonon::PausedState || media->state() == Phonon::PlayingState)
+		{
+			if (history.count() >= 2)
+			{
+				history.pop_back(); // remove the currently playing file
+				MediaFileRef & file = history.back();
+				media->setCurrentSource(file.createMediaSource(this));
+				media->play();
+				Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing previous file " << file.path() << endl;
+				return file;
+			}
+		}
+		else 
+		{
+			if (history.count() > 0)
+			{
+				MediaFileRef & file = history.back();
+				media->setCurrentSource(file.createMediaSource(this));
+				media->play();
+				Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: playing previous file " << file.path() << endl;
+				return file;
+			}
+		}
+		
+		return QString();
+	}
+	
+	void MediaPlayer::queue(kt::MediaFileRef file)
+	{
+		Out(SYS_MPL|LOG_NOTICE) << "MediaPlayer: enqueue " << file.path() << endl;
+		media->enqueue(file.createMediaSource(this));
+		history.append(file);
+		onStateChanged(media->state(),Phonon::StoppedState);
+	}
+		
+	void MediaPlayer::resume()
+	{
+		if (paused() || manually_paused)
+		{
+			if (buffering)
+				manually_paused = false;
+			else
+				media->play();
+		}
+	}
+	
+	void MediaPlayer::setAudioChannel(Phonon::AudioChannelDescription audio_track)
+	{
+		media_controller->setCurrentAudioChannel(audio_track);
+	}
+
+	void MediaPlayer::stop()
+	{
+		media->stop();
+		media->clear();
+		if (buffering)
+			buffering = false;
+		
+		current = MediaFileRef();
+		onStateChanged(media->state(),Phonon::StoppedState);
+	}
+	
 	void MediaPlayer::streamStateChanged(int state)
 	{
 		Out(SYS_MPL|LOG_DEBUG) << "Stream state changed: " << (state == MediaFileStream::BUFFERING ? "BUFFERING" : "PLAYING") << endl;
@@ -227,23 +297,6 @@ namespace kt
 			if (!manually_paused)
 				media->play();
 		}
-	}
-
-	
-	MediaFileRef MediaPlayer::getCurrentSource() const
-	{
-		if (history.isEmpty())
-			return MediaFileRef();
-		else
-			return MediaFileRef(history.back());
-	}
-
-	void MediaPlayer::hasVideoChanged(bool hasVideo)
-	{
-		if (hasVideo)
-			openVideo();
-		else
-			closeVideo();
 	}
 
 }

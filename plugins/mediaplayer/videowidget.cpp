@@ -19,6 +19,7 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.          *
  ***************************************************************************/
 #include <QAction>
+#include <QComboBox>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QMouseEvent>
@@ -93,10 +94,14 @@ namespace kt
 		time_label->setText(formatTime(player->media0bject()->currentTime(),player->media0bject()->totalTime()));
 		time_label->setSizePolicy(QSizePolicy::Maximum,QSizePolicy::Maximum);
 		
+		audio_tracks_combobox = new QComboBox(this);
+		connect(audio_tracks_combobox, SIGNAL(activated(const QString&)), this, SLOT(audioChannelSelected(const QString&)));
+		
 		hlayout->addWidget(tb);
 		hlayout->addWidget(slider);
 		hlayout->addWidget(volume);
 		hlayout->addWidget(time_label);
+		hlayout->addWidget(audio_tracks_combobox);
 		
 		chunk_bar->setFixedHeight(hlayout->sizeHint().height() * 0.75);
 		
@@ -108,12 +113,39 @@ namespace kt
 		connect(player,SIGNAL(playing(MediaFileRef)),this,SLOT(playing(MediaFileRef)));
 		connect(player,SIGNAL(enableActions(unsigned int)),this,SLOT(enableActions(unsigned int)));
 		inhibitScreenSaver(true);
+		connect(player, SIGNAL(availableAudioChannelsChanged(quint8)), this, SLOT(availableAudioChannelsChanged(quint8)));
 	}
 
 
 	VideoWidget::~VideoWidget()
 	{
 		inhibitScreenSaver(false);
+	}
+
+	void VideoWidget::availableAudioChannelsChanged(quint8 audio_channel_index)
+	{
+		audio_tracks_combobox->clear();
+		QList<Phonon::AudioChannelDescription> audio_channels = player->getAudioChannels();
+		Out(SYS_MPL|LOG_NOTICE) << "\tVideoWidget::availableAudioChannelsChanged" << endl;
+		for (quint8 i = 0; i < audio_channels.size(); ++i)
+		{
+			audio_tracks_combobox->addItem(audio_channels[i].name());
+			Out(SYS_MPL|LOG_NOTICE) << "\tVideoWidget::availableAudioChannelsChanged addItem " <<
+				i << "\t" << audio_channels[i].name() << endl;
+		}
+		audio_tracks_combobox->setCurrentIndex(audio_channel_index);
+	}
+
+	void VideoWidget::audioChannelSelected(const QString& audio_channel_name)
+	{
+		QList<Phonon::AudioChannelDescription> audio_channels = player->getAudioChannels();
+		for (quint8 i = 0; i < audio_channels.size(); ++i)
+			if (audio_channels[i].name() == audio_channel_name)
+			{
+				player->setAudioChannel(audio_channels[i]);
+				return;
+			}
+		// couldn't come to this point
 	}
 
 	void VideoWidget::play()
@@ -135,11 +167,11 @@ namespace kt
 		}
 	}
 
-	
 	void VideoWidget::setControlsVisible(bool on)
 	{
 		slider->setVisible(on);
 		volume->setVisible(on);
+		audio_tracks_combobox->setVisible(on);
 		tb->setVisible(on);
 		chunk_bar->setVisible(player->media0bject()->currentSource().type() == Phonon::MediaSource::Stream && on);
 		time_label->setVisible(on);

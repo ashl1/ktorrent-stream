@@ -29,6 +29,7 @@
 #include <kaction.h>
 
 class QAction;
+class QComboBox;
 class QLabel;
 class QStackedWidget;
 class KToolBar;
@@ -63,6 +64,11 @@ namespace kt
 		virtual bool eventFilter(QObject* dst, QEvent* event);
 		
 	private slots:
+		/**
+		 * @param audio_channel_index The index in regards to MediaPlayer::getAudioChannels
+		 */
+		void availableAudioChannelsChanged(quint8 audio_channel_index);
+		void audioChannelSelected(const QString& audio_channel_name);
 		void play();
 		void stop();
 		void setControlsVisible(bool on);
@@ -78,6 +84,7 @@ namespace kt
 		QString formatTime(qint64 cur,qint64 total);
 
 	private:
+		QComboBox* audio_tracks_combobox;
 		Phonon::VideoWidget* video;
 		MediaPlayer* player;
 		Phonon::SeekSlider* slider;
