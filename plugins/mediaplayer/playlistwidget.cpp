@@ -39,7 +39,7 @@ namespace kt
 	PlayListWidget::PlayListWidget(kt::MediaFileCollection* collection, kt::MediaPlayer* player, QWidget* parent) 
 		: QWidget(parent),
 		player(player),
-		menu(0),
+		right_click_menu(0),
 		collection(collection)
 	{
 		QVBoxLayout* layout = new QVBoxLayout(this);
@@ -86,11 +86,11 @@ namespace kt
 				this,SLOT(onSelectionChanged(const QItemSelection&, const QItemSelection&)));
 		connect(view,SIGNAL(doubleClicked(QModelIndex)),this,SLOT(doubleClicked(QModelIndex)));
 		
-		menu = new KMenu(this);
-		menu->addAction(remove_action);
-		menu->addSeparator();
-		menu->addAction(add_action);
-		menu->addAction(clear_action);
+		right_click_menu = new KMenu(this);
+		right_click_menu->addAction(remove_action);
+		right_click_menu->addSeparator();
+		right_click_menu->addAction(add_action);
+		right_click_menu->addAction(clear_action);
 	}
 	
 	PlayListWidget::~PlayListWidget() 
@@ -111,7 +111,7 @@ namespace kt
 		Q_UNUSED(d);
 		QModelIndexList idx = s.indexes();
 		if (idx.count() > 0)
-			fileSelected(fileForIndex(idx.front()));
+			fileSelected(getFileByIndex(idx.front()));
 		else
 			fileSelected(MediaFileRef());
 	}
@@ -156,7 +156,7 @@ namespace kt
 	
 	void PlayListWidget::showContextMenu(QPoint pos) 
 	{
-		menu->popup(view->viewport()->mapToGlobal(pos));
+		right_click_menu->popup(view->viewport()->mapToGlobal(pos));
 	}
 	
 	void PlayListWidget::clearPlayList()
@@ -195,7 +195,7 @@ namespace kt
 		enableNext(play_list->rowCount() > 0);
 	}
 	
-	QModelIndex PlayListWidget::next(const QModelIndex & idx,bool random) const
+	QModelIndex PlayListWidget::getNext(const QModelIndex & idx,bool random) const
 	{
 		if (play_list->rowCount() == 0)
 			return QModelIndex();
@@ -243,19 +243,19 @@ namespace kt
 	}
 	
 	
-	QString PlayListWidget::fileForIndex(const QModelIndex& index) const
+	QString PlayListWidget::getFileByIndex(const QModelIndex& index) const
 	{
 		return play_list->fileForIndex(proxy_model->mapToSource(index)).path();
 	}
 	
 	
-	QModelIndex PlayListWidget::indexForFile(const QString& file) const
+	QModelIndex PlayListWidget::getIndexForFile(const QString& file) const
 	{
 		int count = proxy_model->rowCount(); 
 		for (int i = 0;i < count;i++)
 		{
 			QModelIndex idx = proxy_model->index(i,0);
-			if (fileForIndex(idx) == file)
+			if (getFileByIndex(idx) == file)
 				return idx;
 		}
 		

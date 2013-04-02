@@ -42,7 +42,12 @@ namespace kt
 	class MediaController;
 	
 	/**
-	 * Activity for the media player plugin.
+	 * Activity for the media player plugin. Represent the main tab window:
+	 *  - All files in torrents
+	 *  - Playlist
+	 *  - Play controller
+	 *  - Timeline
+	 * When opening video, new tab only for video will be opened. Look at VideoWidget
 	 */
 	class MediaPlayerActivity : public Activity
 	{
@@ -76,15 +81,19 @@ namespace kt
 		
 	private:
 		QSplitter* splitter;
+		/// The list of media files
 		MediaModel* media_model;
 		MediaPlayer* media_player;
+		/// The widget showing the list of files in torrents
 		MediaView* media_view;
 		MediaController* controller;
 		KTabWidget* tabs;
 		int action_flags;
+		/// Will assigned to new tab, when open video
 		VideoWidget* video;
 		bool fullscreen_mode;
 		QModelIndex curr_item;
+		/// The widget showing the files in playlist
 		PlayListWidget* play_list;
 		QToolButton* close_button;
 		

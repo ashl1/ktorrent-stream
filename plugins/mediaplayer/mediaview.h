@@ -59,6 +59,14 @@ namespace kt
 	};
 
 	/**
+	 * The widget shows files from all torrents. The user can enqueue file or start playing
+	 *  immediately by double clicking on it.
+	 * Contains:
+	 *  - refresh button
+	 *  - "show incomplete files" button
+	 *  - search textbox
+	 *  - the list of files
+	 * Uses MediaModel as files representation.
 		@author
 	*/
 	class MediaView : public QWidget

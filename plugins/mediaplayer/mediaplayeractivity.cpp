@@ -211,8 +211,8 @@ namespace kt
 			curr_item = play_list->play();
 			if (curr_item.isValid())
 			{
-				bool random = play_list->randomOrder();
-				QModelIndex n = play_list->next(curr_item,random);
+				bool random = play_list->isRandomModeActivated();
+				QModelIndex n = play_list->getNext(curr_item,random);
 				next_action->setEnabled(n.isValid());
 			}
 		}
@@ -221,12 +221,12 @@ namespace kt
 	void MediaPlayerActivity::play(const MediaFileRef & file)
 	{
 		media_player->play(file);
-		QModelIndex idx = play_list->indexForFile(file.path());
+		QModelIndex idx = play_list->getIndexForFile(file.path());
 		if (idx.isValid())
 		{
 			curr_item = idx;
-			bool random = play_list->randomOrder();
-			QModelIndex n = play_list->next(curr_item,random);
+			bool random = play_list->isRandomModeActivated();
+			QModelIndex n = play_list->getNext(curr_item,random);
 			next_action->setEnabled(n.isValid());
 		}
 	}
@@ -256,17 +256,17 @@ namespace kt
 
 	void MediaPlayerActivity::next()
 	{
-		bool random = play_list->randomOrder();
-		QModelIndex n = play_list->next(curr_item,random);
+		bool random = play_list->isRandomModeActivated();
+		QModelIndex n = play_list->getNext(curr_item,random);
 		if (!n.isValid())
 			return;
 		
-		QString path = play_list->fileForIndex(n);
+		QString path = play_list->getFileByIndex(n);
 		if (bt::Exists(path))
 		{
 			media_player->play(path);
 			curr_item = n;
-			n = play_list->next(curr_item,random);
+			n = play_list->getNext(curr_item,random);
 			next_action->setEnabled(n.isValid());
 		}
 	}
@@ -306,23 +306,23 @@ namespace kt
 
 	void MediaPlayerActivity::randomPlayActivated(bool on)
 	{
-		QModelIndex next = play_list->next(curr_item,on);
+		QModelIndex next = play_list->getNext(curr_item,on);
 		next_action->setEnabled(next.isValid());
 	}
 
 	void MediaPlayerActivity::aboutToFinishPlaying()
 	{
-		bool random = play_list->randomOrder();
-		QModelIndex n = play_list->next(curr_item,random);
+		bool random = play_list->isRandomModeActivated();
+		QModelIndex n = play_list->getNext(curr_item,random);
 		if (!n.isValid())
 			return;
 		
-		QString path = play_list->fileForIndex(n);
+		QString path = play_list->getFileByIndex(n);
 		if (bt::Exists(path))
 		{
 			media_player->queue(path);
 			curr_item = n;
-			n = play_list->next(curr_item,random);
+			n = play_list->getNext(curr_item,random);
 			next_action->setEnabled(n.isValid());
 		}
 	}
@@ -390,7 +390,7 @@ namespace kt
 		if (bt::Exists(kt::DataDir() + "playlist"))
 			play_list->playList()->load(kt::DataDir() + "playlist");
 		
-		QModelIndex next = play_list->next(curr_item,play_list->randomOrder());
+		QModelIndex next = play_list->getNext(curr_item,play_list->isRandomModeActivated());
 		next_action->setEnabled(next.isValid());
 		
 		media_view->loadState(cfg);

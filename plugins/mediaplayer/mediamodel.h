@@ -46,6 +46,7 @@ namespace kt
 	};
 
 	/**
+	 * Represents the list of media files. Used in MediaView and PlayListWidget.
 		@author
 	*/
 	class MediaModel : public QAbstractListModel,public MediaFileCollection

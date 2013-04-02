@@ -39,6 +39,11 @@ namespace kt
 	class MediaPlayer;
 	class MediaFileCollection;
 	
+	/**
+	 * The widget shows the list of files in playlist
+	 * Consists of:
+	 *  - 
+	 */
 	class PlayListWidget : public QWidget
 	{
 		Q_OBJECT
@@ -56,16 +61,16 @@ namespace kt
 		void loadState(KSharedConfigPtr cfg);
 		
 		/// Get the next item to play, if idx is invalid return the first playable item
-		QModelIndex next(const QModelIndex & idx,bool random) const;
+		QModelIndex getNext(const QModelIndex & idx,bool random) const;
 		
 		/// Get the file of a given index
-		QString fileForIndex(const QModelIndex& index) const;
+		QString getFileByIndex(const QModelIndex& index) const;
 		
 		/// Get the index of a file
-		QModelIndex indexForFile(const QString & file) const;
+		QModelIndex getIndexForFile(const QString & file) const;
 		
 		/// Is random mode activated ?
-		bool randomOrder() const {return random_mode->isChecked();}
+		bool isRandomModeActivated() const {return random_mode->isChecked();}
 		
 	public slots:
 		QModelIndex play();
@@ -93,10 +98,11 @@ namespace kt
 		MediaPlayer* player;
 		PlayList* play_list;
 		QToolBar* tool_bar;
+		/// The list of files in playlist
 		QTreeView* view;
 		QCheckBox* random_mode;
 
-		KMenu* menu;
+		KMenu* right_click_menu;
 		QSortFilterProxyModel* proxy_model;
 		MediaFileCollection* collection;
 	};
